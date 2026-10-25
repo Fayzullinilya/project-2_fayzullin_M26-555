@@ -3,7 +3,6 @@ from primitive_db import engine
 
 
 def main() -> None:
-    print("DB project is running!")
     engine.print_help()
     engine.run()
 

@@ -1,7 +1,8 @@
-import prompt
 import shlex
-from primitive_db import core
-from primitive_db import utils
+
+import prompt
+
+from primitive_db import core, utils
 
 DB_META_JSON = 'db_meta.json'
 
@@ -22,10 +23,12 @@ def run():
                 print_help()
             case 'create_table':
                 if len(args) < 2:
-                    print('Отсутствует имя таблицы. Введите: [create_table <имя_таблицы> <столбец1:тип> <столбец2:тип> ...]')
+                    print('Отсутствует имя таблицы. Введите: [create_table',
+                          '<имя_таблицы> <столбец1:тип> <столбец2:тип> ...]')
                     continue
                 if len(args) < 3:
-                    print('Отсутствует описание колонок. Введите: [create_table <имя_таблицы> <столбец1:тип> <столбец2:тип> ...]')
+                    print('Отсутствует описание колонок. Введите: [create_table',
+                          '<имя_таблицы> <столбец1:тип> <столбец2:тип> ...]')
                     continue
                 db_meta_new = core.create_table(db_meta, args[1], args[2:])
                 if db_meta_new:
@@ -33,7 +36,8 @@ def run():
                     db_meta = db_meta_new
             case 'drop_table':
                 if len(args) < 2:
-                    print('Отсутствует имя таблицы. Введите: [drop_table <имя_таблицы>]')
+                    print('Отсутствует имя таблицы. Введите: [drop_table',
+                          '<имя_таблицы>]')
                     continue
                 db_meta_new = core.drop_table(db_meta, args[1])
                 if db_meta_new:
