@@ -1,106 +1,169 @@
-import re
+from primitive_db import constants
 
-VALID_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
-VALID_TYPE_LIST = {'int', 'str', 'bool'}
-RESERVED_WORDS_LIST = {
-    'order', 'group', 'select', 'insert', 'update', 'delete', 'from',
-    'where', 'and', 'or', 'not', 'null', 'true', 'false', 'count',
-    'sum', 'avg', 'min', 'max', 'date', 'time', 'timestamp'
-}
 
-def create_table(metadata, table_name, columns):
-    
-    if not VALID_NAME_PATTERN.match(table_name):
-        print(f'Имя таблицы "{table_name}" содержит недопустимые символы. Допустимые',
-              'символы: "A-Z", "a-z", "0-9", "_".')
-        return
-    if table_name[0].isdigit():
-        print(f'Имя таблицы "{table_name}" не может начинаться с цифры. Допустимые',
-              'символы: "A-Z", "a-z", "_".')
-        return
-    if table_name.lower() in RESERVED_WORDS_LIST:
-        print(f'В качестве имени таблицы {table_name} нельзя использовать',
-              'зарезервированные слова: {RESERVED_WORDS_LIST}')
-        return
+def is_valid_name(name :str) -> bool:
+    """Проверяет корректность имени таблицы или колонки"""
+    if not name:
+        return False
 
+    # Имя должно состоять только из букв, цифр и подчёркивания,
+    # и начинаться с буквы или подчёркивания
+    return(
+        (all(('A' <= char <= 'Z') or
+             ('a' <= char <= 'z') or 
+             ('0' <= char <= '9') or
+             (char == '_') 
+             for char in name)
+            and (name[0].isalpha() or name[0] == '_')
+        )
+    )
+
+def create_table(metadata :dict , table_name :str, columns :list) -> dict:
+    """
+    Создает таблицу в метаданных.
+
+    Параметры:
+        metadata (dict): Словарь метаданных базы данных.
+        table_name (str): Имя создаваемой таблицы.
+        columns (list[tuple[str,str]]): Список кортежей ('имя', 'тип'),
+        например [('id' ,'int'), ('title' ,'text'), ('release_year', 'int')].
+
+    Правила именования:
+        - Имена таблиц и колонок обрабатываются без учёта регистра 
+          (например, 'Id', 'ID', 'id' считаются одним и тем же именем).
+        - Названия типов всегда приводятся к нижнему регистру   
+        - Колонка 'id' (тип 'int') добавляется автоматически. Если пользователь 
+          передаёт колонку с именем 'id' в любом регистре, она игнорируется.
+        - Если наименовани колонок дублируются (в любом регистре) добавляется
+          только первая по порядку следования, остальные игнорируются.
+        - Для создании таблицы требуется как минимум одна пользовательская колонка
+          Минимальная таблица может содержать 2 колонки: id + колонка пользователя.
+
+    Выполняет следующие шаги:
+        - Проверяет, существует ли таблица с указанным именем.
+        - Валидирует имя таблицы (допустимые символы, зарезервированные слова).
+        - Проверяет имена кольнок на дубликаты
+        - Проверяет корректность типов данных колонок.
+        - Валидирует имена колонок (допустимые символы, зарезервированные слова).
+        - Добавляет описание таблицы в метаданные.
+
+    Возвращает:
+        dict: Обновлённые метаданные с добавленной таблицей.
+
+    Вызывает:
+        ValueError: Если имя таблицы или колонок некорректно, либо таблица
+                    уже существует.
+    """
+
+    # Проверка: имя таблицы не содержит запрещенные символы и не начинается с цифры
+    if not is_valid_name(table_name):
+        raise ValueError(
+            f'Неверное имя таблицы "{table_name}". Имя может содержать только '
+             'символы: "A-Z", "a-z", "0-9", "_" и не может начинаться с цифры.'
+        )
+
+    # Проверка: имя таблицы не входит в список зарезервированных слов 
+    if table_name.lower() in constants.RESERVED_WORDS_LIST:
+        raise ValueError(
+            f'"{table_name}" является зарезервированным словом и не может быть '
+             'использовано в качестве имени таблицы.'
+        )    
+
+    # Проверка: таблица уже существует
     tables = metadata.get('tables', [])
-    is_exist = False
     for table in tables:
-        if table_name == table['name']:
-            is_exist = True
-            break
-    if is_exist:
-        print(f'Таблица {table_name} уже существует')
-        return
+        if table.get("name").lower() == table_name.lower():
+            raise ValueError(f'Таблица {table_name} уже существует.')
+
+    new_columns = [{'name':'id', 'type':'int'}] # Автоматическое добаление id
+    added_columns = ['id'] # список добавленных колонок для поиска дубликатов
     
-    new_columns = []
-    for col in columns:
-        if ':' not in col:
-            print(f'Неверный формат колонки "{col}". Введите: [create_table',
-                  '<имя_таблицы> <столбец1:тип> <столбец2:тип> ...].')
-            return
+    for column in columns:    
 
-        name, type = col.split(':')
+        # Провера формата
+        if not isinstance(column, tuple) or len(column) != 2:
+            raise ValueError(
+                f'Элемент списка колонок {column} должен быть кортежем из'
+                 'двух значений (имя, тип).'
+            )
 
-        if not VALID_NAME_PATTERN.match(name):
-            print(f'Имя колонки "{name}" содержит недопустимые символы. Допустимые',
-                  'символы: "A-Z", "a-z", "0-9", "_".')
-            return
-        if name[0].isdigit():
-            print(f'Имя колонки "{name}" не может начинаться с цифры. Допустимые',
-                  'символы: "A-Z", "a-z", "_".')
-            return
-        if name.lower() in RESERVED_WORDS_LIST:
-            print(f'В качестве имени колонки {name} нельзя использовать',
-                  'зарезервированные слова: {RESERVED_WORDS_LIST}')
-            return
-        if type not in VALID_TYPE_LIST:
-            print(f'Недопустимый тип данных {type} для колонки {name}. Допустимые типы',
-                  'данных: {VALID_TYPE_LIST}')
-            return                        
-        new_column = {'name':name, 'type':type}
+        col_name,col_type = column
+        
+        # типы данных записываются в нижнем регистре
+        col_type = col_type.lower()
+
+        # Колонка "id:int" добавлена автоматически. Пропускаем 
+        if col_name.lower() == 'id':
+            continue
+
+        # Пропуск дубликатов
+        if col_name.lower() in added_columns:
+            continue
+        added_columns.append(col_name.lower())
+
+        # Проверка: имя колонки не содержит запрещенные символы и не начинается с цифры
+        if not is_valid_name(col_name):
+            raise ValueError(
+                f'Неверное имя колонки "{col_name}". Имя может содержать только '
+                 'символы: "A-Z", "a-z", "0-9", "_" и не может начинаться с цифры.'
+            )
+  
+        # Проверка: имя колонки не входит в список зарезервированных слов 
+        if col_name.lower() in constants.RESERVED_WORDS_LIST:
+            raise ValueError(
+                f'"{col_name}" является зарезервированным словом и не может быть '
+                 'использовано в качестве имени колонки.'
+            )
+
+        # Проверка: тип данных соответствует допустимым
+        if col_type.lower() not in constants.VALID_TYPE_LIST:
+            raise ValueError(
+                f'Недопустимый тип данных {col_type} для колонки {col_name}. '
+                f'Допустимые типы данных: {constants.VALID_TYPE_LIST}.'
+            )
+
+        # Добавляем валидированную колонку в список новых колонок 
+        new_column = {'name':col_name, 'type':col_type}
         new_columns.append(new_column)
-    
-    if 'id' not in new_columns:
-        new_columns.insert(0,{'name':'id', 'type':'int'})    
+
+    # Проверка: небыло добавлено ниодной польовательской колонки
+    if len(new_columns) == 1:
+        raise ValueError('Недостаточно колонок для создания таблицы.')
+
+    # Добавляем новую таблицу
     new_table = {"name":table_name, "columns":new_columns}
-    
     tables.append(new_table)
     metadata['tables'] = tables
-    print(f'Таблица {table_name} успешно создана со столбцами id:int,',
-          f'{', '.join(columns)}.')
     return metadata
 
-def drop_table(metadata, table_name):
+def drop_table(metadata :dict, table_name :str) -> dict:
+    """
+    Удаляет таблицу из метаданных.
+    Параметры:
+        metadata (dict): Словарь метаданных базы данных.
+        table_name (str): Имя Удаляемой таблицы.
+    Возвращает:
+        dict: Обновлённые метаданные без удаленной таблицы.
+    Вызывает:
+        ValueError: Если указанная таблица не существует.
+    """
     tables = metadata.get('tables', [])
-    if len(tables) == 0:
-        print('База данных не содержит таблиц')
-        return
 
-    i = 0
-    is_exist = False
-    for table in tables:
-        if table_name == table['name']:
-            is_exist = True
-            table_position = i
-            break
-        i += 1
+    for i, table in enumerate(tables):
+        if table.get('name').lower() == table_name.lower():
+            tables.pop(i)
+            metadata['tables'] = tables
+            return metadata
 
-    if not is_exist:
-        print(f'Таблицы {table_name} не существует')
-        return
-    metadata['tables'].pop(table_position)
-    print(f'Таблица {table_name} удалена')
-    return metadata
+    raise ValueError(f'Таблицы {table_name} не существует.')    
 
-def list_tables(metadata):
+def list_tables(metadata :dict) -> list:
+    """
+    Параметры: metadata (dict): Словарь метаданных базы данных.
+    Возвращает: list: Список таблиц из метаданных.
+    """
     tables = metadata.get('tables', [])
-    if len(tables) == 0:
-        print('База данных не содержит таблиц')
-        return
-
-    for table in tables:
-        print(f' - {table['name']}')
+    return [table.get('name','') for table in tables]
 
 
 

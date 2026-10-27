@@ -1,7 +1,7 @@
 [project]
 name = "primitive-db"
 version = "0.1.0"
-description = "Add your description here"
+description = "Домашнее задание №2"
 readme = "README.md"
 authors = [
     { name = "Fayzullin Ilya", email = "ilyafayzullin@yandex.com" }
@@ -12,7 +12,6 @@ dependencies = [
 ]
 
 [project.scripts]
-project = "primitive_db.main:main"
 database = "primitive_db.main:main"
 
 [build-system]
