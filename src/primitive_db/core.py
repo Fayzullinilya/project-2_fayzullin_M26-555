@@ -165,6 +165,99 @@ def list_tables(metadata :dict) -> list:
     tables = metadata.get('tables', [])
     return [table.get('name','') for table in tables]
 
+def insert(metadata :dict, table_name :str, table_data :list, values :list) -> dict:
+    """
+    Добавляет одну запись в таблицу.
+
+    Параметры:
+        metadata (dict): Словарь метаданных базы данных.
+        table_name (str): Имя таблицы в которую необходимо добавить запись.
+        table_data (list[dict]): Данные таблицы. Параметр не указан в тексте
+            задания, но он здесь нужен, что бы исключить необходимость вызывать
+            utils.load_table_data(), поскольку это нарушит принятую структуру.
+        values (list): Список значений, например ["Sergei", 28, true].
+
+    Правила:
+        - Все колонки таблицы считаются обязательными.
+        - ID генерируется автоматически - max(IDs).
+        - Считаем, что следующие условия гарантированы процедурой создания
+          таблицы create_table (проверки не выполняются):
+          - первая колонка называется 'id';
+          - в таблице есть как минимум одна колонка кроме 'id';
+          - типы колонок только int, str, bool в нижнем регистре;
+          - колонка 'id' содержит только целые числа (гарантия insert).
+
+    Выполняет следующие шаги:
+        - Проверяет, существует ли таблица с указанным именем в метаданных.
+        - Проверяет, что количество переданных значений соответствует 
+          количеству столбцов (минус ID).
+        - Валидирует типы данных для каждого значения в соответствии со
+          схемой в метаданных.
+        - Генерирует новый ID.
+        - Добавляет новую запись (в виде словаря) в данные таблицы.
+
+    Возвращает:
+        dict: Данные таблицы с добавленной новой строкой.
+
+    Вызывает:
+        ValueError: Если таблица не существует, не совпадает количество столбцев
+                    или неверный тип даных. 
+    """
+
+    tables = metadata.get('tables', [])
+
+    if table_name not in tables:
+        raise ValueError(f'Таблица "{table_name}" не существует.')
+
+    table = tables[table_name]
+    columns = table['columns']
+
+    # Проверка количества значений (без id)
+    if len(values) != len(columns) - 1:
+        raise ValueError(
+            f"Ожидается {len(columns) - 1} значений (без id), получено {len(values)}."
+        )
+
+    # Расчёт следующего ID
+    ids = [row['id'] for row in table_data]
+    max_id = max(ids) if ids else 0
+    next_id = max_id + 1
+
+    # Сборка новой строки
+    new_row = {'id': next_id}
+
+    for i, col in enumerate(columns[1:], start=0):
+        col_name = col.get('name')
+        col_type = col.get('type')
+        raw_value = values[i]
+
+        # Проверка типов данных
+        match col_type:
+            case 'int':
+                try:
+                    value = int(raw_value)
+                except (ValueError, TypeError):
+                    raise ValueError(
+                        f'Для колонки "{col_name}" ожидался int, '
+                        f'получено: {raw_value}'
+                    )
+            case 'bool':
+                if raw_value.lower() == "true" or raw_value == '1':
+                    value = True
+                elif raw_value.lower() == "false" or raw_value == '0':
+                    value = False
+                else:
+                    raise ValueError(
+                        f'Для колонки "{col_name}" ожидался bool (true/false), '
+                        f'получено: {raw_value}'
+                    )
+            case _:
+                # Все остальное - это str
+                value = raw_value
+
+        new_row[col_name] = value
+
+    return table_data + [new_row]
 
 
 
