@@ -1,6 +1,9 @@
 # Файл метаданных
 DB_META_JSON = 'db_meta.json'
 
+# Папка с данными таблиц
+DB_DATA_PATH = 'data'
+
 # Список допустимых типов колонок
 VALID_TYPE_LIST = {'int', 'str', 'bool'}
 
