@@ -1,7 +1,7 @@
-from primitive_db import constants
+from primitive_db import constants, parser
 
 
-def is_valid_name(name :str) -> bool:
+def _is_valid_name(name :str) -> bool:
     """Проверяет корректность имени таблицы или колонки"""
     if not name:
         return False
@@ -56,7 +56,7 @@ def create_table(metadata :dict , table_name :str, columns :list) -> dict:
     """
 
     # Проверка: имя таблицы не содержит запрещенные символы и не начинается с цифры
-    if not is_valid_name(table_name):
+    if not _is_valid_name(table_name):
         raise ValueError(
             f'Неверное имя таблицы "{table_name}". Имя может содержать только '
              'символы: "A-Z", "a-z", "0-9", "_" и не может начинаться с цифры.'
@@ -102,7 +102,7 @@ def create_table(metadata :dict , table_name :str, columns :list) -> dict:
         added_columns.append(col_name.lower())
 
         # Проверка: имя колонки не содержит запрещенные символы и не начинается с цифры
-        if not is_valid_name(col_name):
+        if not _is_valid_name(col_name):
             raise ValueError(
                 f'Неверное имя колонки "{col_name}". Имя может содержать только '
                  'символы: "A-Z", "a-z", "0-9", "_" и не может начинаться с цифры.'
@@ -180,6 +180,9 @@ def insert(metadata :dict, table_name :str, table_data :list, values :list) -> d
     Правила:
         - Все колонки таблицы считаются обязательными.
         - ID генерируется автоматически - max(IDs).
+        - Значения типв bool могут передаваться в любом регистре, а так же
+          в виде "0"/"1"
+
         - Считаем, что следующие условия гарантированы процедурой создания
           таблицы create_table (проверки не выполняются):
           - первая колонка называется 'id';
@@ -259,6 +262,24 @@ def insert(metadata :dict, table_name :str, table_data :list, values :list) -> d
 
     return table_data + [new_row]
 
+def select(table_data: list, where_clause: str = None) -> list:
+    """
+    Возвращает отфильтрованный список строк (dict).
+    """
+    filters = parser.parse_where(where_clause)
 
+    if not filters:
+        # Без фильтра возвращаем все строки
+        return [row.copy() for row in table_data]
+
+    def matches(row: dict) -> bool:
+        for col, expected in filters.items():
+            if col not in row:
+                return False
+            if row[col] != expected:
+                return False
+        return True
+
+    return [row.copy() for row in table_data if matches(row)]
 
 

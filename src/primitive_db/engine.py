@@ -2,7 +2,9 @@ import shlex
 
 import prompt
 
-from primitive_db import constants, core, utils
+import prettytable
+
+from primitive_db import constants, core, parser, utils
 
 
 def parse_columns(raw_cols: list[str]) -> list[tuple[str, str]]:
@@ -92,6 +94,55 @@ def run() -> None:
                     else:
                         print('База данных не содержит таблиц.')
 
+                case 'insert':
+                    if (len(command) < 5 or
+                        command[1].lower() != 'into' or 
+                        command[3].lower() != 'values'
+                    ):
+                        print(
+                            'Используйте: [insert into <имя_таблицы>'
+                            'values (<str>, <int>, <bool>, ...)]'
+                        )
+                        continue
+
+                    table_name = command[2]
+
+                    # Всё, что идёт после "values" — содержимое скобок
+                    raw_values_str = ' '.join(command[4:])
+
+                    # Проверяем, что есть скобки
+                    if (not raw_values_str.startswith('(') or
+                        not raw_values_str.endswith(')')
+                    ):
+                        print(
+                            'Ошибка: ожидается формат: insert into <таблица>'
+                            'values (<v1>, <v2>, ...)'
+                        )
+                        continue
+
+                    inner = raw_values_str[1:-1].strip()
+                    values = []
+
+                    if inner:
+                        parts = parser.parse_string(inner)
+                        for p in parts:
+                            p = p.strip()
+                            if not p:
+                                continue
+
+                            # Если значение в кавычках (одинарных или двойных) — убираем их.
+                            if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
+                                p = p[1:-1]
+
+                            values.append(p)
+
+                    current_rows = utils.load_table_data(table_name)
+                    updated_rows = core.insert(db_meta, table_name, current_rows, values)
+                    utils.save_table_data(table_name, updated_rows)
+                    print(f"Строка успешно добавлена в таблицу '{table_name}'.")                 
+
+                case 'select':
+                    pass
                 case _:
                     print(
                         f'Неизвестная команда "{command}". '
