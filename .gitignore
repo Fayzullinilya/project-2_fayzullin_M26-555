@@ -3,4 +3,5 @@ __pycache__
 .venv/
 .vscode/
 dist/
-db_meta.jsom
+db_meta.json
+data/

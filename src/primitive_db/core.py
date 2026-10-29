@@ -208,12 +208,16 @@ def insert(metadata :dict, table_name :str, table_data :list, values :list) -> d
     """
 
     tables = metadata.get('tables', [])
+    table = None
+    for t in tables:
+        if t.get("name").lower() == table_name.lower():
+            table = t
+            break
 
-    if table_name not in tables:
+    if table is None:
         raise ValueError(f'Таблица "{table_name}" не существует.')
 
-    table = tables[table_name]
-    columns = table['columns']
+    columns = table.get('columns',[])
 
     # Проверка количества значений (без id)
     if len(values) != len(columns) - 1:
@@ -223,8 +227,10 @@ def insert(metadata :dict, table_name :str, table_data :list, values :list) -> d
 
     # Расчёт следующего ID
     ids = [row['id'] for row in table_data]
-    max_id = max(ids) if ids else 0
-    next_id = max_id + 1
+    if ids:
+        next_id = max(ids) + 1
+    else:
+        next_id = 0
 
     # Сборка новой строки
     new_row = {'id': next_id}
@@ -266,10 +272,11 @@ def select(table_data: list, where_clause: str = None) -> list:
     """
     Возвращает отфильтрованный список строк (dict).
     """
+
     filters = parser.parse_where(where_clause)
 
+    # Без фильтра возвращаем все строки
     if not filters:
-        # Без фильтра возвращаем все строки
         return [row.copy() for row in table_data]
 
     def matches(row: dict) -> bool:
@@ -282,4 +289,128 @@ def select(table_data: list, where_clause: str = None) -> list:
 
     return [row.copy() for row in table_data if matches(row)]
 
+def update(metadata: dict, table_name: str, table_data: list,
+           set_clause: str, where_clause: str = None) -> list:
 
+    tables = metadata.get('tables', [])
+    table = None
+    for t in tables:
+        if t.get("name").lower() == table_name.lower():
+            table = t
+            break
+
+    if table is None:
+        raise ValueError(f'Таблица "{table_name}" не существует.')
+
+    columns = table.get("columns", [])
+    columns_types = {col["name"]: col["type"] for col in table["columns"]}
+    allowed_columns = {col.get("name") for col in columns if col.get("name")}
+
+    set_values = parser.parse_where(set_clause)
+
+    # Проверяем, что все колонки из SET существуют в схеме
+    for col in set_values.keys():
+        if col.lower() not in allowed_columns:
+            raise ValueError(f'Колонка "{col}" не существует в таблице "{table_name}".')
+
+    filters = parser.parse_where(where_clause)
+
+    def matches(row :dict) -> bool:
+        for col, expected in filters.items():
+            if col not in row:
+                return False
+            if row[col] != expected:
+                return False
+        return True
+
+    matched_indices = [i for i, row in enumerate(table_data) if matches(row)]
+    if not matched_indices:
+        return [row.copy() for row in table_data]
+
+    new_table = [row.copy() for row in table_data]
+    for idx in matched_indices:
+        row = new_table[idx]
+        for col_name, raw_value in set_values.items():
+            expected_type = columns_types[col_name]
+            match expected_type:
+                case "int":
+                    try:
+                        value = int(raw_value)
+                    except (ValueError, TypeError):
+                        raise ValueError(
+                            f'Для колонки "{col_name}" ожидался int, '
+                            f'получено: "{raw_value}"'
+                        )
+                case "bool":
+                    if isinstance(raw_value, bool):
+                        value = raw_value
+                    elif isinstance(raw_value, str):
+                        v = raw_value.lower()
+                        if v in ("true", "1"):
+                            value = True
+                        elif v in ("false", "0",):
+                            value = False
+                        else:
+                            raise ValueError(
+                                f'Для колонки "{col_name}" ожидался bool (true/false, 1/0), '
+                                f'получено: {raw_value}'
+                            )
+                    elif isinstance(raw_value, (int)):
+                        value = bool(raw_value)
+                    else:
+                        raise ValueError(
+                                f'Для колонки "{col_name}" ожидался bool (true/false, 1/0), '
+                                f'получено: {raw_value}'
+                        )
+                case "str":
+                    value = str(raw_value)
+                case _:
+                    raise ValueError(
+                        f'Не удалось преобразовать значение "{raw_value}" '
+                        f'для колонки "{col_name}":"{expected_type}"' 
+                    )
+            row[col_name] = value
+
+    return new_table
+
+# primitive_db/core.py
+from typing import List, Dict, Any, Optional
+from .parser import parse_where
+
+def delete(table_data :list, where_clause :str = None) -> list:
+    """
+    Удаляет строки, совпадающие с where_clause.
+    Возвращает изменённый список table_data.
+    Если совпадений нет — ничего не удаляет, список возвращается как есть.
+    """
+    # без условия не удаляем
+    if not where_clause or not where_clause.strip():
+        return table_data
+
+    filters = parse_where(where_clause)
+
+    def matches(row):
+        for col, expected in filters.items():
+            if col not in row:
+                return False
+            if row[col] != expected:
+                return False
+        return True
+
+    filtered = [row for row in table_data if not matches(row)]
+
+    return filtered
+
+def table_info(metadata: Dict[str, Any], table_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Возвращает метаданные таблицы (name, columns) или None, если таблица не найдена.
+    """
+    tables = metadata.get("tables", [])
+    for t in tables:
+        t_name = t.get("name",'')
+        if str(t_name).lower() == table_name.lower():
+            return {
+                "name": t_name,
+                "columns": t.get("columns", [])
+            }
+    return None
