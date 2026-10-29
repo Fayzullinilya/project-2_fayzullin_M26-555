@@ -112,7 +112,7 @@ def save_table_data(table_name :str, data :dict) -> None:
             f'Ошибка записи файла данных. {e}',
         )
 
-def load_table_data(table_name :str) -> dict:
+def load_table_data(table_name :str) -> list:
     """
     Загружает данные таблицы из JSON-файла.
 
@@ -121,7 +121,7 @@ def load_table_data(table_name :str) -> dict:
 
     Возвращает:
         dict: содержимое файла как словарь. Если файл не найден возвращается 
-              пустой словарь {}.
+              пустой список [].
 
     Вызывает:
         RuntimeError: если файл повреждён (невалидный JSON), нет доступа
@@ -132,11 +132,11 @@ def load_table_data(table_name :str) -> dict:
     try:
         filepath = os.path.join(constants.DB_DATA_PATH, f'{table_name}.json')
         with open(filepath, "r", encoding="utf-8") as f:
-            db_meta = json.load(f)
-            return db_meta 
+            tbl_data = json.load(f)
+            return tbl_data 
     
     except FileNotFoundError:
-        return {}
+        return []
     
     except json.JSONDecodeError:
         raise RuntimeError(
