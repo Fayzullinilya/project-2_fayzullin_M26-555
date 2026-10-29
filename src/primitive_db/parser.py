@@ -30,8 +30,7 @@ def parse_string(s: str) -> list:
     return result
 
 def parse_value(val_str: str):
-    """
-    """
+    """Парсит строковое представление значения в соответствующий Python-тип."""
     val_str = val_str.strip()
     # bool
     if val_str.lower() == 'true':

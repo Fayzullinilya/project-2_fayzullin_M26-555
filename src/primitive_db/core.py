@@ -270,9 +270,34 @@ def insert(metadata :dict, table_name :str, table_data :list, values :list) -> d
 
 def select(table_data: list, where_clause: str = None) -> list:
     """
-    Возвращает отфильтрованный список строк (dict).
-    """
+    Выполняет операцию SELECT для таблицы. Возвращает строки, удовлетворяющие
+    условию WHERE. Если условие не указано, возвращаются все строки таблицы.
 
+    Параметры:
+        table_data (list): Список словарей, представляющих строки таблицы.
+        where_clause (str): Условие фильтрации строк в формате пар «col = value».
+                            Если не указано или равно None, возвращаются все строки.
+                            Поддерживается только сравнение на равенство.
+                            Пример: "id = 1" или "age = 18".
+
+    Выполняет следующие шаги:
+        - Если where_clause не передан — возвращает копию всех строк таблицы.
+        - Парсит условие WHERE (ожидается формат: "col1 = val1, col2 = val2, ...").
+        - Для каждой строки проверяет соответствие всем условиям из WHERE.
+        - Собирает и возвращает список строк, которые удовлетворяют всем условиям.
+        - Возвращает новую копию подходящих строк.
+
+    Возвращает:
+        Новый список словарей (копию подходящих строк таблицы). Если ни одна строка
+        не удовлетворяет условию, возвращается пустой список. Исходный список
+        `table_data` остаётся неизменным.
+
+    Вызывает:
+        ValueError: Если условие WHERE некорректно (например, отсутствует знак «=»,
+                    невозможно распарсить значение и т.п.) или содержит
+                    неподдерживаемый формат.
+    """
+    
     filters = parser.parse_where(where_clause)
 
     # Без фильтра возвращаем все строки
@@ -291,7 +316,44 @@ def select(table_data: list, where_clause: str = None) -> list:
 
 def update(metadata: dict, table_name: str, table_data: list,
            set_clause: str, where_clause: str = None) -> list:
+    """
+    Выполняет операцию UPDATE для таблицы. Обновляет значения указанных колонок в
+    строках, удовлетворяющих условию WHERE, с обязательной проверкой существования
+    колонок и приведением типов значений согласно метаданным таблицы.
 
+    Параметры:
+    metadat (dict): Словарь метаданных базы данных.
+    table_name (str): Имя таблицы, в которой выполняется обновление.
+    table_data (list): Список словарей, представляющих строки таблицы.
+    set_clause (str): Строка с присваиваниями для обновления. Формат:
+                      "col1 = value1, col2 = value2". Значения могут быть в
+                      кавычках (для строк), булевыми литералами или числами.
+                      Пример: "age = 28, is_active = true, name = 'Ivan Ivanov'"
+    where_clause (str): Условие фильтрации строк для обновления в формате пар 
+                        "col = value". Если не указано или равно None, обновляются
+                        все строки таблицы.
+                        Пример: "id = 1" или "age = 18" (поддерживается только
+                        равенство).
+    
+    Выполняет следующие шаги:
+      - Ищет таблицу по имени (регистронезависимо).
+      - Парсит предложение SET (ожидается формат: "col1 = val1, col2 = val2, ...").
+      - Проверяет, что все указанные в SET колонки существуют в схеме таблицы.
+      - Парсит условие WHERE (если передано) и находит совпадающие строки.
+      - Если совпадений нет — возвращает копию исходной таблицы без изменений.
+      - Для каждой совпадающей строки приводит значения к типам, указанным в метаданных
+      - Возвращает новую копию таблицы с внесёнными изменениями.
+
+    Возвращает:
+        Dict: Новый список словарей (копию исходной таблицы) с обновлёнными значениями.
+              Исходный список `table_data` остаётся неизменным.
+
+    Вызывает:
+        ValueError: Если таблица с указанным именем не найдена в метаданных, в SET
+                    указана несуществующая колонка или значение не может быть
+                    приведено к типу, указанному в метаданных.
+
+    """
     tables = metadata.get('tables', [])
     table = None
     for t in tables:
@@ -352,15 +414,15 @@ def update(metadata: dict, table_name: str, table_data: list,
                             value = False
                         else:
                             raise ValueError(
-                                f'Для колонки "{col_name}" ожидался bool (true/false, 1/0), '
-                                f'получено: {raw_value}'
+                                f'Для колонки "{col_name}" ожидался bool (true/false, '
+                                f'1/0), получено: {raw_value}'
                             )
                     elif isinstance(raw_value, (int)):
                         value = bool(raw_value)
                     else:
                         raise ValueError(
-                                f'Для колонки "{col_name}" ожидался bool (true/false, 1/0), '
-                                f'получено: {raw_value}'
+                                f'Для колонки "{col_name}" ожидался bool (true/false, '
+                                f'1/0), получено: {raw_value}'
                         )
                 case "str":
                     value = str(raw_value)
@@ -373,10 +435,6 @@ def update(metadata: dict, table_name: str, table_data: list,
 
     return new_table
 
-# primitive_db/core.py
-from typing import List, Dict, Any, Optional
-from .parser import parse_where
-
 def delete(table_data :list, where_clause :str = None) -> list:
     """
     Удаляет строки, совпадающие с where_clause.
@@ -387,7 +445,7 @@ def delete(table_data :list, where_clause :str = None) -> list:
     if not where_clause or not where_clause.strip():
         return table_data
 
-    filters = parse_where(where_clause)
+    filters = parser.parse_where(where_clause)
 
     def matches(row):
         for col, expected in filters.items():
@@ -401,16 +459,16 @@ def delete(table_data :list, where_clause :str = None) -> list:
 
     return filtered
 
-def table_info(metadata: Dict[str, Any], table_name: str) -> Optional[Dict[str, Any]]:
+def table_info(metadata: dict, table_name: str) -> dict:
     """
     Возвращает метаданные таблицы (name, columns) или None, если таблица не найдена.
     """
-    tables = metadata.get("tables", [])
+    tables = metadata.get('tables', [])
     for t in tables:
-        t_name = t.get("name",'')
+        t_name = t.get('name','')
         if str(t_name).lower() == table_name.lower():
             return {
-                "name": t_name,
-                "columns": t.get("columns", [])
+                'name': t_name,
+                'columns': t.get('columns', [])
             }
     return None

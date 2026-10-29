@@ -1,8 +1,7 @@
 import shlex
 
-import prompt
-
 import prettytable as pt
+import prompt
 
 from primitive_db import constants, core, parser, utils
 
@@ -131,16 +130,18 @@ def run() -> None:
                                 continue
 
                             # Если значение в кавычках — убираем их.
-                            if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
+                            if (p.startswith('"') and p.endswith('"')) or\
+                               (p.startswith("'") and p.endswith("'")):
                                 p = p[1:-1]
 
                             values.append(p)
 
                     current_rows = utils.load_table_data(table_name)
-                    updated_rows = core.insert(db_meta, table_name, current_rows, values)
+                    updated_rows = core.insert(db_meta, table_name,
+                                               current_rows, values)
                     utils.save_table_data(table_name, updated_rows)
-                    print(f"Строка успешно добавлена в таблицу '{table_name}'.")                 
-
+                    print(f"Строка успешно добавлена в таблицу '{table_name}'.")
+                    
                 case 'select':
                     if (len(args) < 3 or
                         args[1].lower() != 'from'
@@ -332,11 +333,13 @@ def run() -> None:
 def print_help() -> None:
     """Выводит справочную информацию"""
    
-    print("\n***Процесс работы с таблицей***")
+    print("***Процесс работы с таблицей***")
     print("Функции:")
     print("<command> create_table <имя_таблицы> <столбец1:тип> .. - создать таблицу")
     print("<command> list_tables - показать список всех таблиц")
     print("<command> drop_table <имя_таблицы> - удалить таблицу")
+    print("\n***Операции с данными***")
+    print("Функции:")
     print("<command> insert into <имя_таблицы> values (<значение1>, <значение2>, ...) "
           "- создать запись.")
     print("<command> select from <имя_таблицы> where <столбец> = <значение> - "
