@@ -31,6 +31,7 @@ def _get_table(metadata :dict, table_name :str) -> dict | None:
 def _validate_value(raw_value, col_name: str, col_type: str):
     """
     Валидирует и приводит значение к указаному типу (int, bool или str).
+    Используется в insert и update.
     Вызывает ValueError если тип не совпадает с ожидаемым.
     """
     match col_type:
@@ -80,7 +81,8 @@ def create_table(metadata :dict , table_name :str,
     Правила именования:
         - Имена таблиц и колонок обрабатываются без учёта регистра 
           (например, 'Id', 'ID', 'id' считаются одним и тем же именем).
-        - Названия типов всегда приводятся к нижнему регистру   
+        - Имена таблиц, колонок и названия типов хранятся в метаданных только
+          в нижнем регистре.
         - Колонка 'id' (тип 'int') добавляется автоматически. Если пользователь 
           передаёт колонку с именем 'id' в любом регистре, она игнорируется.
         - Если наименовани колонок дублируются (в любом регистре) добавляется
@@ -103,7 +105,9 @@ def create_table(metadata :dict , table_name :str,
         ValueError: Если имя таблицы или колонок некорректно, либо таблица
                     уже существует.
     """
-
+    # Храним имена только в нижне регистре
+    table_name = table_name.lower()
+    
     # Проверка: имя таблицы не содержит запрещенные символы и не начинается с цифры
     if not _is_valid_name(table_name):
         raise ValueError(
@@ -112,7 +116,7 @@ def create_table(metadata :dict , table_name :str,
         )
 
     # Проверка: имя таблицы не входит в список зарезервированных слов 
-    if table_name.lower() in constants.RESERVED_WORDS_LIST:
+    if table_name in constants.RESERVED_WORDS_LIST:
         raise ValueError(
             f'"{table_name}" является зарезервированным словом и не может быть '
              'использовано в качестве имени таблицы.'
@@ -122,7 +126,7 @@ def create_table(metadata :dict , table_name :str,
 
     # Проверка: таблица уже существует
     for table in tables:
-        if table.get("name", '').lower() == table_name.lower():
+        if table.get("name", '') == table_name:
             raise ValueError(f'Таблица "{table_name}" уже существует.')
 
     new_columns = [{'name':'id', 'type':'int'}] # Автоматическое добаление id
@@ -139,17 +143,18 @@ def create_table(metadata :dict , table_name :str,
 
         col_name,col_type = column
         
-        # типы данных записываются в нижнем регистре
+        # имена колонок и типы данных хранятся в нижнем регистре
+        col_name = col_name.lower()
         col_type = col_type.lower()
 
         # Колонка "id:int" добавлена автоматически. Пропускаем 
-        if col_name.lower() == 'id':
+        if col_name == 'id':
             continue
 
         # Пропуск дубликатов
-        if col_name.lower() in added_columns:
+        if col_name in added_columns:
             continue
-        added_columns.append(col_name.lower())
+        added_columns.append(col_name)
 
         # Проверка: имя колонки не содержит запрещенные символы и не начинается с цифры
         if not _is_valid_name(col_name):
@@ -159,14 +164,14 @@ def create_table(metadata :dict , table_name :str,
             )
   
         # Проверка: имя колонки не входит в список зарезервированных слов 
-        if col_name.lower() in constants.RESERVED_WORDS_LIST:
+        if col_name in constants.RESERVED_WORDS_LIST:
             raise ValueError(
                 f'"{col_name}" является зарезервированным словом и не может быть '
                  'использовано в качестве имени колонки.'
             )
 
         # Проверка: тип данных соответствует допустимым
-        if col_type.lower() not in constants.VALID_TYPE_LIST:
+        if col_type not in constants.VALID_TYPE_LIST:
             raise ValueError(
                 f'Недопустимый тип данных "{col_type}" для колонки "{col_name}". '
                 f'Допустимые типы данных: {constants.VALID_TYPE_LIST}.'
@@ -197,10 +202,11 @@ def drop_table(metadata :dict, table_name :str) -> dict:
     Вызывает:
         ValueError: Если указанная таблица не существует.
     """
+    table_name = table_name.lower()
     tables = metadata.setdefault('tables', [])
 
     for i, table in enumerate(tables):
-        if table.get('name', '').lower() == table_name.lower():
+        if table.get('name', '') == table_name:
             del tables[i]
             return metadata
 
@@ -256,6 +262,7 @@ def insert(metadata :dict, table_name :str,
                     или неверный тип даных. 
     """
 
+    table_name = table_name.lower()
     table = _get_table(metadata, table_name)
     if table is None:
         raise ValueError(f'Таблица "{table_name}" не существует.')
@@ -270,7 +277,10 @@ def insert(metadata :dict, table_name :str,
 
     # Расчёт следующего ID
     ids = [row.get('id') for row in table_data]
-    next_id = (max(ids) + 1) if ids else 0
+    if not ids:
+        next_id = 0
+    else:
+        next_id = max(ids) + 1
 
     # Сборка новой строки
     new_row = {'id': next_id}
@@ -285,7 +295,7 @@ def insert(metadata :dict, table_name :str,
         
         new_row[col_name] = value
 
-    return table_data + [new_row]
+    return [*table_data, new_row]
 
 def select(table_data: list[dict], where_clause: dict = None) -> list[dict]:
     """
@@ -317,6 +327,7 @@ def select(table_data: list[dict], where_clause: dict = None) -> list[dict]:
 
     def matches(row: dict) -> bool:
         for col, expected in where_clause.items():
+            col = col.lower()
             if col not in row:
                 return False
             if row[col] != expected:
@@ -361,6 +372,7 @@ def update(metadata: dict, table_name: str, table_data: list,
 
     """
 
+    table_name = table_name.lower()
     table = _get_table(metadata, table_name)
     if table is None:
         raise ValueError(f'Таблица "{table_name}" не существует.')
@@ -378,6 +390,7 @@ def update(metadata: dict, table_name: str, table_data: list,
         if where_clause is None:
             return True
         for col, expected in where_clause.items():
+            col = col.lower()    
             if col not in row:
                 return False
             if row[col] != expected:
@@ -392,6 +405,7 @@ def update(metadata: dict, table_name: str, table_data: list,
     for idx in matched_indices:
         row = new_table[idx]
         for col_name, raw_value in set_clause.items():
+            col_name = col_name.lower()
             expected_type = columns_types[col_name]
             value = _validate_value(raw_value, col_name, expected_type)
             row[col_name] = value
@@ -410,6 +424,7 @@ def delete(table_data :list, where_clause :dict = None) -> list:
 
     def matches(row):
         for col, expected in where_clause.items():
+            col = col.lower()
             if col not in row:
                 return False
             if row[col] != expected:
@@ -424,10 +439,12 @@ def table_info(metadata: dict, table_name: str) -> dict:
     """
     Возвращает метаданные таблицы (name, columns) или None, если таблица не найдена.
     """
+
+    table_name = table_name.lower()
     tables = metadata.get('tables', [])
     for t in tables:
-        t_name = t.get('name','')
-        if str(t_name).lower() == table_name.lower():
+        t_name = t.get('name', '')
+        if t_name == table_name:
             return {
                 'name': t_name,
                 'columns': t.get('columns', [])
