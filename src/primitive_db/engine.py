@@ -3,7 +3,8 @@ import shlex
 import prettytable as pt
 import prompt
 
-from primitive_db import core, utils, parser, constants
+from primitive_db import constants, core, parser, utils
+
 
 def handle_create(db_meta: dict, args: list[str]) -> dict:
     """
@@ -101,14 +102,15 @@ def handle_insert(db_meta :dict, args :list[str]) -> None:
         - Проверку формата командной строки (наличие ключевых слов into/values,
           количества аргументов);
         - Парсинг командной строки на имя таблицы и список значений;
-        - Парсинг значений из скобок с предварительной проверкой на пустоту;
+        - Парсинг значений из скобок игнорируя запятые внутри кавычек;
         - Загрузку данных таблицы через utils.load_table_data;
         - Вызов core.insert для валидации и добавления строки;
         - Сохранение обновлённых данных через utils.save_table_data;
         - Вывод сообщения об успешном добавлении.
 
     Вызывает:
-        ValueError: При неверном формате команды, отсутствии значений или ошибках валидации в core.
+        ValueError: При неверном формате команды, отсутствии значений или ошибках
+                    валидации в core.
     """
     if (len(args) < 5 or
         args[1].lower() != 'into' or 
@@ -138,11 +140,11 @@ def handle_insert(db_meta :dict, args :list[str]) -> None:
 
     values = parser.parse_values(inner)
     current_rows = utils.load_table_data(table_name)
-    updated_rows = core.insert(db_meta, table_name,
+    updated_rows, new_id = core.insert(db_meta, table_name,
                                current_rows, values)
     utils.save_table_data(table_name, updated_rows)
 
-    print(f'Строка успешно добавлена в таблицу "{table_name}".')
+    print(f'Строка c id = {new_id} успешно добавлена в таблицу "{table_name}".')
 
 def handle_select(db_meta :dict, args :list[str]) -> None:
     """
@@ -285,7 +287,7 @@ def handle_delete(args :str) -> None:
     else:
         utils.save_table_data(table_name, new_data)
         print(
-            f'Количество удвленных из таблицы "{table_name}" '
+            f'Количество удаленных из таблицы "{table_name}" '
             f'записей - {deleted_count}.'
         )
 
@@ -334,22 +336,32 @@ def run() -> None:
     while True:
         try:
             user_input = prompt.string('>>>Введите команду: ')
-            args = shlex.split(user_input)
+            args = shlex.split(user_input, posix=False)
             if len(args) == 0:
                 continue
             
             command = args[0].lower()
             match command:
-                case 'exit': break
-                case 'help': print_help()
-                case 'create_table': db_meta = handle_create(db_meta, args)
-                case 'drop_table': db_meta = handle_drop(db_meta, args)
-                case 'list_tables': handle_list(db_meta)
-                case 'insert': handle_insert(db_meta, args)
-                case 'select': handle_select(db_meta, args)
-                case 'update': handle_update(db_meta, args)
-                case 'delete': handle_delete(args)
-                case 'info': handle_info(db_meta, args)
+                case 'exit':
+                    break
+                case 'help':
+                    print_help()
+                case 'create_table':
+                    db_meta = handle_create(db_meta, args)
+                case 'drop_table':
+                    db_meta = handle_drop(db_meta, args)
+                case 'list_tables':
+                    handle_list(db_meta)
+                case 'insert':
+                    handle_insert(db_meta, args)
+                case 'select':
+                    handle_select(db_meta, args)
+                case 'update':
+                    handle_update(db_meta, args)
+                case 'delete':
+                    handle_delete(args)
+                case 'info':
+                    handle_info(db_meta, args)
                 case _:
                     print(
                         f'Неизвестная команда "{command}". '

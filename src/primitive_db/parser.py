@@ -49,6 +49,7 @@ def parse_string(s: str) -> list:
     return result
 
 def parse_values(raw_vals :str) -> list:
+    """Парсит строку значений для insert игнорируя запятые внутри кавычек"""
     values = []
     if raw_vals:
         parts = parse_string(raw_vals)
@@ -121,7 +122,6 @@ def parse_where(where_str: str) -> dict:
         result[col_name] = value
 
     return result
-
 
 def parse_set(set_str: str) -> dict:
     """

@@ -221,7 +221,7 @@ def list_tables(metadata :dict) -> list:
     return [table.get('name','') for table in tables]
 
 def insert(metadata :dict, table_name :str,
-           table_data :list[dict], values :list) -> list[dict]:
+           table_data :list[dict], values :list) -> tuple[list[dict], int]:
     """
     Добавляет одну запись в таблицу.
 
@@ -236,13 +236,14 @@ def insert(metadata :dict, table_name :str,
     Правила:
         - Все колонки таблицы считаются обязательными.
         - ID генерируется автоматически - max(IDs).
-        - Значения типв bool могут передаваться в любом регистре, а так же
+        - Значения типов bool могут передаваться в любом регистре, а так же
           в виде "0"/"1"
         - Считаем, что следующие условия гарантированы процедурой создания
           таблицы create_table (проверки не выполняются):
           - первая колонка называется 'id';
           - в таблице есть как минимум одна колонка кроме 'id';
           - типы колонок только int, str, bool в нижнем регистре;
+          - названия таблиц и колонок хранятся в нижнем регистре
           - колонка 'id' содержит только целые числа (гарантия insert).
 
     Выполняет следующие шаги:
@@ -255,7 +256,7 @@ def insert(metadata :dict, table_name :str,
         - Добавляет новую запись (в виде словаря) в данные таблицы.
 
     Возвращает:
-        dict: Данные таблицы с добавленной новой строкой.
+        tuple[list[dict], int]: (новый список строк, id добавленной записи).
 
     Вызывает:
         ValueError: Если таблица не существует, не совпадает количество столбцев
@@ -295,7 +296,8 @@ def insert(metadata :dict, table_name :str,
         
         new_row[col_name] = value
 
-    return [*table_data, new_row]
+        new_table = [*table_data, new_row]
+    return new_table, next_id
 
 def select(table_data: list[dict], where_clause: dict = None) -> list[dict]:
     """
@@ -363,7 +365,8 @@ def update(metadata: dict, table_name: str, table_data: list,
       - Возвращает новую копию таблицы с внесёнными изменениями.
 
     Возвращает:
-        list[dict]: Новый список словарей (копию исходной таблицы) с обновлёнными значениями.
+        list[dict]: Новый список словарей (копию исходной таблицы) с обновлёнными
+                    значениями.
 
     Вызывает:
         ValueError: Если таблица с указанным именем не найдена в метаданных, в SET
@@ -388,7 +391,7 @@ def update(metadata: dict, table_name: str, table_data: list,
 
     def matches(row :dict) -> bool:
         if where_clause is None:
-            return True
+            return False
         for col, expected in where_clause.items():
             col = col.lower()    
             if col not in row:
