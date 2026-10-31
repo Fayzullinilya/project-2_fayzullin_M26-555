@@ -1,3 +1,22 @@
+def parse_columns(raw_cols: list[str]) -> list[tuple[str, str]]:
+    """
+    Рабирает список из описаний колонок "имя:тип" в список кортежей ('имя', 'тип')
+    """
+    columns = []
+    for col in raw_cols:
+        if col.count(':') != 1:
+            raise ValueError(
+                f'Описание колонки "{col}" должна содержать ровно одно '
+                 'двоеточие (формат: имя:тип).'
+            )
+        name, typ = col.split(':', 1)
+        if not name or not typ:
+            raise ValueError(
+                f'В рписании колонки "{col}" имя и тип не могут быть пустыми.'
+            )
+        columns.append((name, typ))
+    return columns
+
 def parse_string(s: str) -> list:
     """
     Разбивает строку значений по запятым, игнорируя запятые внутри кавычек.
@@ -29,6 +48,23 @@ def parse_string(s: str) -> list:
 
     return result
 
+def parse_values(raw_vals :str) -> list:
+    values = []
+    if raw_vals:
+        parts = parse_string(raw_vals)
+        for p in parts:
+            p = p.strip()
+            if not p:
+                continue
+
+            # Если значение в кавычках — убираем их.
+            if (p.startswith('"') and p.endswith('"')) or\
+                (p.startswith("'") and p.endswith("'")):
+                p = p[1:-1]
+
+            values.append(p)
+    return values    
+
 def parse_value(val_str: str):
     """Парсит строковое представление значения в соответствующий Python-тип."""
     val_str = val_str.strip()
@@ -54,6 +90,9 @@ def parse_where(where_str: str) -> dict:
     
     Возвращает словарь фильтров.
     Строковые значения должны быть в кавычках.
+
+    В текущей реализации парсеры where и set идентичны, поскольку
+    where допускает только знак равенства.
     """
     if not where_str or not where_str.strip():
         return {}
@@ -70,13 +109,56 @@ def parse_where(where_str: str) -> dict:
 
         eq_index = part.find('=')
         if eq_index == -1:
-            raise ValueError(f'В условии нет "=": {part}')
+            raise ValueError(f'В условии "{part}" отсутствует знак "=".')
 
-        key = part[:eq_index].strip()
+        col_name = part[:eq_index].strip()
         val_raw = part[eq_index + 1:].strip()
 
-        val = parse_value(val_raw)
-        result[key] = val
+        if not col_name:
+            raise ValueError(f'Имя колонки не указано в условии "{part}".')
+
+        value = parse_value(val_raw)
+        result[col_name] = value
 
     return result
 
+
+def parse_set(set_str: str) -> dict:
+    """
+    Парсит строку set вида:
+      "age = 28"
+      "name = 'Sergei'"
+      "age = 28, name = 'Sergei'"
+    
+    Возвращает словарь присвоений.
+    Строковые значения должны быть в кавычках.
+    """
+
+    if not set_str or not set_str.strip():
+        return {}
+
+    set_str = set_str.strip()
+    result = {}
+
+    parts = parse_string(set_str)
+
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+
+        eq_index = part.find('=')
+        if eq_index == -1:
+            raise ValueError(f'В присваивании "{part}" отсутствует знак "=".')
+
+        col_name = part[:eq_index].strip()
+        val_str = part[eq_index + 1:].strip()
+
+        if not col_name:
+            raise ValueError(f'Имя колонки не указано в присваивании "{part}".')
+
+        # Приводим значение к типу
+        value = parse_value(val_str)
+        result[col_name] = value
+
+    return result
