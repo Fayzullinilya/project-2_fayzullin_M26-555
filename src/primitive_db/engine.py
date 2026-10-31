@@ -3,9 +3,9 @@ import shlex
 import prettytable as pt
 import prompt
 
-from primitive_db import constants, core, parser, utils
+from primitive_db import core, utils, parser, constants, decorators
 
-
+@decorators.handle_errors
 def handle_create(db_meta: dict, args: list[str]) -> dict:
     """
     Обработчик команды create_table.
@@ -47,6 +47,7 @@ def handle_create(db_meta: dict, args: list[str]) -> dict:
 
     return db_meta_new
 
+@decorators.handle_errors
 def handle_drop(db_meta :dict, args :list[str]) -> dict:
     """
     Обработчик команды drop_table.
@@ -82,6 +83,7 @@ def handle_drop(db_meta :dict, args :list[str]) -> dict:
     
     return db_meta_new
 
+@decorators.handle_errors
 def handle_list(db_meta :dict) -> None:
     """Обработчик команды list_tables. Выводит список всех таблиц в консоль."""
     tables_list = core.list_tables(db_meta)
@@ -90,6 +92,8 @@ def handle_list(db_meta :dict) -> None:
     else:
         print('База данных не содержит таблиц.')
 
+@decorators.log_time
+@decorators.handle_errors
 def handle_insert(db_meta :dict, args :list[str]) -> None:
     """
     Обработчик команды insert.
@@ -146,6 +150,8 @@ def handle_insert(db_meta :dict, args :list[str]) -> None:
 
     print(f'Строка c id = {new_id} успешно добавлена в таблицу "{table_name}".')
 
+@decorators.log_time
+@decorators.handle_errors
 def handle_select(db_meta :dict, args :list[str]) -> None:
     """
     Обработчик команды select.
@@ -204,6 +210,8 @@ def handle_select(db_meta :dict, args :list[str]) -> None:
 
     print(formatted_data)
 
+@decorators.log_time
+@decorators.handle_errors
 def handle_update(db_meta :dict, args :list[str]) -> None:
     if len(args) < 4 or args[2].lower() != 'set':
         raise ValueError(
@@ -250,6 +258,7 @@ def handle_update(db_meta :dict, args :list[str]) -> None:
                     
     print(f'Записи в таблице "{table_name}" успешно обновлены.')
 
+@decorators.handle_errors
 def handle_delete(args :str) -> None:
     if len(args) < 3 or args[1].lower() != 'from':
         raise ValueError(
@@ -291,6 +300,7 @@ def handle_delete(args :str) -> None:
             f'записей - {deleted_count}.'
         )
 
+@decorators.handle_errors
 def handle_info(db_meta :dict, args :str) -> None:
     if len(args) < 2:
         raise ValueError('Используйте: info <имя_таблицы>')
@@ -299,10 +309,10 @@ def handle_info(db_meta :dict, args :str) -> None:
 
     table_meta = core.table_info(db_meta, table_name)
     if table_meta is None:
-        raise ValueError('Таблица "{table_name}" не найдена в метаданных.')
+        raise KeyError('Таблица "{table_name}" не найдена в метаданных.')
     columns = table_meta["columns"]
     if not columns:
-        raise ValueError(f'Таблица "{table_name}" найдена, но у неё нет колонок.')
+        raise KeyError(f'Таблица "{table_name}" найдена, но у неё нет колонок.')
 
     print(f"Информация о таблице: {table_meta['name']}")
     print("-" * 40)
@@ -368,13 +378,12 @@ def run() -> None:
                          'help - справочная информация.'
                     )
 
-        except ValueError as e:
-            print(f'Ошибка: {e}')
-
+        # Не перехватывается декоратором
         except RuntimeError as e:
             print(f'Критичесая ошибка: {e}')
             break
 
+        # Все остальные ошибки
         except Exception:
             print('Произошла неизвестная ошибка. Попробуйте повторить операцию.')
 

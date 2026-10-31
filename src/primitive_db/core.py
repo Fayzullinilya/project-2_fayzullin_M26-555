@@ -1,4 +1,4 @@
-from primitive_db import constants
+from primitive_db import constants, decorators
 
 
 def _is_valid_name(name :str) -> bool:
@@ -191,6 +191,7 @@ def create_table(metadata :dict , table_name :str,
 
     return metadata
 
+@decorators.confirm_action('удаление таблицы')
 def drop_table(metadata :dict, table_name :str) -> dict:
     """
     Удаляет таблицу из метаданных.
@@ -210,7 +211,7 @@ def drop_table(metadata :dict, table_name :str) -> dict:
             del tables[i]
             return metadata
 
-    raise ValueError(f'Таблица "{table_name}" не найдена.')    
+    raise KeyError(f'Таблица "{table_name}" не найдена.')    
 
 def list_tables(metadata :dict) -> list:
     """
@@ -266,7 +267,7 @@ def insert(metadata :dict, table_name :str,
     table_name = table_name.lower()
     table = _get_table(metadata, table_name)
     if table is None:
-        raise ValueError(f'Таблица "{table_name}" не существует.')
+        raise KeyError(f'Таблица "{table_name}" не существует.')
 
     columns = table.get('columns',[])
 
@@ -378,7 +379,7 @@ def update(metadata: dict, table_name: str, table_data: list,
     table_name = table_name.lower()
     table = _get_table(metadata, table_name)
     if table is None:
-        raise ValueError(f'Таблица "{table_name}" не существует.')
+        raise KeyError(f'Таблица "{table_name}" не существует.')
 
     columns = table.get("columns", [])
     columns_types = {col["name"]: col["type"] for col in table["columns"]}
@@ -415,6 +416,7 @@ def update(metadata: dict, table_name: str, table_data: list,
 
     return new_table
 
+@decorators.confirm_action('удаление записей')
 def delete(table_data :list, where_clause :dict = None) -> list:
     """
     Удаляет строки, совпадающие с where_clause.
@@ -444,12 +446,11 @@ def table_info(metadata: dict, table_name: str) -> dict:
     """
 
     table_name = table_name.lower()
-    tables = metadata.get('tables', [])
-    for t in tables:
-        t_name = t.get('name', '')
-        if t_name == table_name:
-            return {
-                'name': t_name,
-                'columns': t.get('columns', [])
-            }
-    return None
+    table = _get_table(metadata,table_name)
+    if table:
+        return {
+            'name': table.get('name', ''),
+            'columns': table.get('columns', [])
+        }
+    else:
+        return None
