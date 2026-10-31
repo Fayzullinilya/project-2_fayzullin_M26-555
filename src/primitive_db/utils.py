@@ -61,12 +61,12 @@ def load_metadata(filepath :str) -> dict:
         return {}
     except json.JSONDecodeError:
         raise RuntimeError(
-            'Файл метаданных повреждён: проверьте или удалите его, '
+            'Файл метаданных повреждён. Проверьте или удалите его, '
             'чтобы начать с новой базы.'
         )
     except PermissionError:
         raise RuntimeError(
-            'Нет доступа к файлу метаданных: проверьте права, '
+            'Нет доступа к файлу метаданных. Проверьте права, '
             'или удалите файл для создания новой базы.'
         )
     except OSError as e:
@@ -93,7 +93,7 @@ def save_table_data(table_name :str, data :dict) -> None:
         # Если папка не существует, то создаем ее
         os.makedirs(constants.DB_DATA_PATH, exist_ok=True)
 
-        filepath = os.path.join(constants.DB_DATA_PATH, f'{table_name}.json')
+        filepath = os.path.join(constants.DB_DATA_PATH, f'{table_name.lower()}.json')
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
@@ -130,7 +130,7 @@ def load_table_data(table_name :str) -> list:
                       (не перезаписывать существующие данные пустым справочником).
     """
     try:
-        filepath = os.path.join(constants.DB_DATA_PATH, f'{table_name}.json')
+        filepath = os.path.join(constants.DB_DATA_PATH, f'{table_name.lower()}.json')
         with open(filepath, "r", encoding="utf-8") as f:
             tbl_data = json.load(f)
             return tbl_data 
