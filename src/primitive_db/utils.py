@@ -23,17 +23,17 @@ def save_metadata(filepath :str, data :dict) -> None:
             json.dump(data, f, ensure_ascii=False, indent=4)
     except TypeError:
         raise RuntimeError(
-            'Не удалось сериализовать данные в JSON. '
+            'не удалось сериализовать данные в JSON. '
             'Изменения не сохранились'
         )
     except PermissionError:
         raise RuntimeError(
-            'Нет прав на запись файла метаданных. '
+            'нет прав на запись файла метаданных. '
             'Изменения не сохранились'
         )
     except OSError as e:
         raise RuntimeError(
-            f'Ошибка записи файла метаданных. {e}',
+            f'ошибка записи файла метаданных. {e}',
         )
 
 def load_metadata(filepath :str) -> dict:
@@ -61,17 +61,17 @@ def load_metadata(filepath :str) -> dict:
         return {}
     except json.JSONDecodeError:
         raise RuntimeError(
-            'Файл метаданных повреждён. Проверьте или удалите его, '
+            'файл метаданных повреждён. Проверьте или удалите его, '
             'чтобы начать с новой базы.'
         )
     except PermissionError:
         raise RuntimeError(
-            'Нет доступа к файлу метаданных. Проверьте права, '
+            'нет доступа к файлу метаданных. Проверьте права, '
             'или удалите файл для создания новой базы.'
         )
     except OSError as e:
         raise RuntimeError(
-            f'Ошибка чтения файла метаданных. {e}',
+            f'ошибка чтения файла метаданных. {e}',
         )
 
 def save_table_data(table_name :str, data :dict) -> None:
@@ -99,17 +99,17 @@ def save_table_data(table_name :str, data :dict) -> None:
 
     except TypeError:
         raise RuntimeError(
-            'Не удалось сериализовать данные в JSON. '
+            'не удалось сериализовать данные в JSON. '
             'Изменения не сохранились'
         )
     except PermissionError:
         raise RuntimeError(
-            'Нет прав на запись файла данных. '
+            'нет прав на запись файла данных. '
             'Изменения не сохранились'
         )
     except OSError as e:
         raise RuntimeError(
-            f'Ошибка записи файла данных. {e}',
+            f'ошибка записи файла данных. {e}',
         )
 
 def load_table_data(table_name :str) -> list:
@@ -140,15 +140,15 @@ def load_table_data(table_name :str) -> list:
     
     except json.JSONDecodeError:
         raise RuntimeError(
-            'Файл данных повреждён: проверьте или удалите его, '
+            'файл данных повреждён: проверьте или удалите его, '
             'чтобы начать с чистой таблицы.'
         )
     except PermissionError:
         raise RuntimeError(
-            'Нет доступа к файлу данных: проверьте права, '
+            'нет доступа к файлу данных: проверьте права, '
             'или удалите файл для создания новой таблицы.'
         )
     except OSError as e:
         raise RuntimeError(
-            f'Ошибка чтения файла данных. {e}',
+            f'ошибка чтения файла данных. {e}',
         )

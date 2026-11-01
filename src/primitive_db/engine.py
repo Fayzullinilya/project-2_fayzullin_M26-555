@@ -3,7 +3,8 @@ import shlex
 import prettytable as pt
 import prompt
 
-from primitive_db import core, utils, parser, constants, decorators
+from primitive_db import constants, core, decorators, parser, utils
+
 
 @decorators.handle_errors
 def handle_create(db_meta: dict, args: list[str]) -> dict:
@@ -40,10 +41,11 @@ def handle_create(db_meta: dict, args: list[str]) -> dict:
 
     columns = parser.parse_columns(raw_columns)
     db_meta_new = core.create_table(db_meta, table_name, columns)
-    utils.save_metadata(constants.DB_META_JSON, db_meta_new)
+    if db_meta_new:
+        utils.save_metadata(constants.DB_META_JSON, db_meta_new)
 
-    columns_str = ', '.join(f'"{name}":{typ}' for name, typ in columns)
-    print(f'Таблица "{table_name}" успешно создана с колонками: {columns_str}.')
+        columns_str = ', '.join(f'"{name}":{typ}' for name, typ in columns)
+        print(f'Таблица "{table_name}" успешно создана с колонками: {columns_str}.')
 
     return db_meta_new
 
@@ -77,9 +79,9 @@ def handle_drop(db_meta :dict, args :list[str]) -> dict:
         )
     table_name = args[1]
     db_meta_new = core.drop_table(db_meta, table_name)
-    utils.save_metadata(constants.DB_META_JSON, db_meta_new)
-
-    print(f'Таблица "{table_name}" успешно удалена.')
+    if db_meta_new:
+        utils.save_metadata(constants.DB_META_JSON, db_meta_new)
+        print(f'Таблица "{table_name}" успешно удалена.')
     
     return db_meta_new
 
@@ -201,7 +203,7 @@ def handle_select(db_meta :dict, args :list[str]) -> None:
 
     where_clause = parser.parse_where(where_string)
     table_data = utils.load_table_data(table_name)
-    selected_data = core.select(table_data,where_clause)
+    selected_data = core.select(db_meta, table_name, table_data, where_clause)
 
     formatted_data = pt.PrettyTable()
     formatted_data.field_names = columns
@@ -286,19 +288,20 @@ def handle_delete(args :str) -> None:
     where_clause = parser.parse_where(where_string)
     table_data = utils.load_table_data(table_name)
     new_data = core.delete(table_data, where_clause)
-    deleted_count = len(table_data) - len(new_data)
+    if new_data:
+        deleted_count = len(table_data) - len(new_data)
 
-    if deleted_count == 0:
-        raise ValueError(
-            'По условию WHERE не найдено ни одной строки в '
-            f'таблице "{table_name}". Записи не удалены.'
-        )
-    else:
-        utils.save_table_data(table_name, new_data)
-        print(
-            f'Количество удаленных из таблицы "{table_name}" '
-            f'записей - {deleted_count}.'
-        )
+        if deleted_count == 0:
+            raise ValueError(
+                'По условию WHERE не найдено ни одной строки в '
+                f'таблице "{table_name}". Записи не удалены.'
+            )
+        else:
+            utils.save_table_data(table_name, new_data)
+            print(
+                f'Количество удаленных из таблицы "{table_name}" '
+                f'записей - {deleted_count}.'
+            )
 
 @decorators.handle_errors
 def handle_info(db_meta :dict, args :str) -> None:
@@ -345,7 +348,7 @@ def run() -> None:
 
     while True:
         try:
-            user_input = prompt.string('>>>Введите команду: ')
+            user_input = prompt.string('\n>>>Введите команду: ')
             args = shlex.split(user_input, posix=False)
             if len(args) == 0:
                 continue
@@ -357,9 +360,13 @@ def run() -> None:
                 case 'help':
                     print_help()
                 case 'create_table':
-                    db_meta = handle_create(db_meta, args)
+                    db_meta_new = handle_create(db_meta, args)
+                    if db_meta_new:
+                        db_meta = db_meta_new
                 case 'drop_table':
-                    db_meta = handle_drop(db_meta, args)
+                    db_meta_new = handle_drop(db_meta, args)
+                    if db_meta_new:
+                        db_meta = db_meta_new
                 case 'list_tables':
                     handle_list(db_meta)
                 case 'insert':
@@ -380,12 +387,13 @@ def run() -> None:
 
         # Не перехватывается декоратором
         except RuntimeError as e:
-            print(f'Критичесая ошибка: {e}')
+            print(f'Критичесая ошибка: {str(e)}')
             break
 
         # Все остальные ошибки
-        except Exception:
-            print('Произошла неизвестная ошибка. Попробуйте повторить операцию.')
+        except Exception as e:
+            print('Произошла неизвестная ошибка. Попробуйте повторить '
+                  f'операцию. {str(e)}')
 
 def print_help() -> None:
     """Выводит справочную информацию"""
@@ -409,4 +417,4 @@ def print_help() -> None:
     print("<command> info <имя_таблицы> - вывести информацию о таблице.")
     print("\nОбщие команды:")
     print("<command> exit - выход из программы")
-    print("<command> help - справочная информация\n")
+    print("<command> help - справочная информация")
