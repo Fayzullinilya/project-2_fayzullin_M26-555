@@ -1,5 +1,6 @@
-from primitive_db import constants
+from primitive_db import constants, decorators
 
+cacher, clear_cache = decorators.create_cacher()
 
 def _is_valid_name(name :str) -> bool:
     """Проверяет корректность имени таблицы или колонки"""
@@ -40,7 +41,7 @@ def _validate_value(raw_value, col_name: str, col_type: str):
                 return int(raw_value)
             except (ValueError, TypeError):
                 raise ValueError(
-                    f'Для колонки "{col_name}" ожидался int, получено: {raw_value}'
+                    f'для колонки "{col_name}" ожидался int, получено: {raw_value}'
                 )
         case 'bool':
             raw_str = str(raw_value).strip().lower()
@@ -50,7 +51,7 @@ def _validate_value(raw_value, col_name: str, col_type: str):
                 return False
             else:
                 raise ValueError(
-                    f'Для колонки "{col_name}" ожидался bool (true/false/1/0), '
+                    f'для колонки "{col_name}" ожидался bool (true/false/1/0), '
                     f'получено: {raw_value}'
                 )
         case _:
@@ -111,7 +112,7 @@ def create_table(metadata :dict , table_name :str,
     # Проверка: имя таблицы не содержит запрещенные символы и не начинается с цифры
     if not _is_valid_name(table_name):
         raise ValueError(
-            f'Неверное имя таблицы "{table_name}". Имя может содержать только '
+            f'неверное имя таблицы "{table_name}". Имя может содержать только '
              'символы: "A-Z", "a-z", "0-9", "_" и не может начинаться с цифры.'
         )
 
@@ -127,7 +128,7 @@ def create_table(metadata :dict , table_name :str,
     # Проверка: таблица уже существует
     for table in tables:
         if table.get("name", '') == table_name:
-            raise ValueError(f'Таблица "{table_name}" уже существует.')
+            raise KeyError(f'таблица "{table_name}" уже существует.')
 
     new_columns = [{'name':'id', 'type':'int'}] # Автоматическое добаление id
     added_columns = ['id'] # список добавленных колонок для поиска дубликатов
@@ -137,7 +138,7 @@ def create_table(metadata :dict , table_name :str,
         # Провера формата
         if not isinstance(column, tuple) or len(column) != 2:
             raise ValueError(
-                f'Элемент списка колонок "{column}" должен быть кортежем из'
+                f'элемент списка колонок "{column}" должен быть кортежем из'
                  'двух значений (имя, тип).'
             )
 
@@ -159,7 +160,7 @@ def create_table(metadata :dict , table_name :str,
         # Проверка: имя колонки не содержит запрещенные символы и не начинается с цифры
         if not _is_valid_name(col_name):
             raise ValueError(
-                f'Неверное имя колонки "{col_name}". Имя может содержать только '
+                f'неверное имя колонки "{col_name}". Имя может содержать только '
                  'символы: "A-Z", "a-z", "0-9", "_" и не может начинаться с цифры.'
             )
   
@@ -173,7 +174,7 @@ def create_table(metadata :dict , table_name :str,
         # Проверка: тип данных соответствует допустимым
         if col_type not in constants.VALID_TYPE_LIST:
             raise ValueError(
-                f'Недопустимый тип данных "{col_type}" для колонки "{col_name}". '
+                f'недопустимый тип данных "{col_type}" для колонки "{col_name}". '
                 f'Допустимые типы данных: {constants.VALID_TYPE_LIST}.'
             )
 
@@ -183,7 +184,7 @@ def create_table(metadata :dict , table_name :str,
 
     # Проверка: небыло добавлено ниодной польовательской колонки
     if len(new_columns) == 1:
-        raise ValueError('Недостаточно колонок для создания таблицы.')
+        raise ValueError('недостаточно колонок для создания таблицы.')
 
     # Добавляем новую таблицу
     new_table = {"name":table_name, "columns":new_columns}
@@ -191,6 +192,7 @@ def create_table(metadata :dict , table_name :str,
 
     return metadata
 
+@decorators.confirm_action('удаление таблицы')
 def drop_table(metadata :dict, table_name :str) -> dict:
     """
     Удаляет таблицу из метаданных.
@@ -200,7 +202,7 @@ def drop_table(metadata :dict, table_name :str) -> dict:
     Возвращает:
         dict: Обновлённые метаданные без удаленной таблицы.
     Вызывает:
-        ValueError: Если указанная таблица не существует.
+        KeyError: Если указанная таблица не существует.
     """
     table_name = table_name.lower()
     tables = metadata.setdefault('tables', [])
@@ -210,7 +212,7 @@ def drop_table(metadata :dict, table_name :str) -> dict:
             del tables[i]
             return metadata
 
-    raise ValueError(f'Таблица "{table_name}" не найдена.')    
+    raise KeyError(f'таблица "{table_name}" не найдена.')
 
 def list_tables(metadata :dict) -> list:
     """
@@ -259,21 +261,22 @@ def insert(metadata :dict, table_name :str,
         tuple[list[dict], int]: (новый список строк, id добавленной записи).
 
     Вызывает:
-        ValueError: Если таблица не существует, не совпадает количество столбцев
+        KeyError: Если таблица не существует.
+        ValueError: Если не совпадает количество столбцев
                     или неверный тип даных. 
     """
 
     table_name = table_name.lower()
     table = _get_table(metadata, table_name)
     if table is None:
-        raise ValueError(f'Таблица "{table_name}" не существует.')
+        raise KeyError(f'таблица "{table_name}" не существует.')
 
     columns = table.get('columns',[])
 
     # Проверка количества значений (без id)
     if len(values) != len(columns) - 1:
         raise ValueError(
-            f"Ожидается {len(columns) - 1} значений (без id), получено {len(values)}."
+            f"ожидается {len(columns) - 1} значений (без id), получено {len(values)}."
         )
 
     # Расчёт следующего ID
@@ -297,14 +300,25 @@ def insert(metadata :dict, table_name :str,
         new_row[col_name] = value
 
         new_table = [*table_data, new_row]
+
+    # очищаем кэш, что бы select заново считывал таблицу
+    clear_cache()
+
     return new_table, next_id
 
-def select(table_data: list[dict], where_clause: dict = None) -> list[dict]:
+def select(metadata :dict, table_name :str,
+           table_data: list[dict], where_clause: dict = None) -> list[dict]:
     """
     Выполняет операцию SELECT для таблицы. Возвращает строки, удовлетворяющие
     условию WHERE. Если условие не указано, возвращаются все строки таблицы.
 
     Параметры:
+        metadata (dict): Словарь метаданных базы данных. Параметр не указан в тексте
+                         задания, но он здесь нужен, что бы проверить наличие колонок
+                         из условия WHERE в метаданных.
+        table_name (str): Имя таблицы в которую необходимо добавить запись. Параметр
+                          не указан в тексте задания, но он здесь нужен, что бы
+                          сформировать ключ для поиска результата запроса в кэше. 
         table_data (list): Список словарей, представляющих строки таблицы.
         where_clause (dict | None): Словарь условий фильтрации вида
                                     {col_name: expected_value}.
@@ -321,22 +335,38 @@ def select(table_data: list[dict], where_clause: dict = None) -> list[dict]:
     Возвращает:
         Новый список словарей (копию подходящих строк таблицы). Если ни одна строка
         не удовлетворяет условию, возвращается пустой список.
+    
+    Вызывает:
+        KeyError: Если колонка из условия WHERE не существует.
     """
+    
+    key = (table_name.lower(), tuple(sorted(where_clause.items())))
 
-    # Без фильтра возвращаем все строки
-    if not where_clause:
-        return [row.copy() for row in table_data]
+    def run_select():
+        # Без фильтра возвращаем все строки
+        if not where_clause:
+            return [row.copy() for row in table_data]
 
-    def matches(row: dict) -> bool:
-        for col, expected in where_clause.items():
-            col = col.lower()
-            if col not in row:
-                return False
-            if row[col] != expected:
-                return False
-        return True
+        # Проверяем наличие колонок из условия WHERE в метаданных
+        columns = get_columns(metadata, table_name)
+        for col in where_clause:
+            if col.lower() not in columns:
+                raise KeyError(
+                    f"колонка '{col}' не существует в таблице '{table_name}'"
+                )
 
-    return [row.copy() for row in table_data if matches(row)]
+        def matches(row: dict) -> bool:
+            for col, expected in where_clause.items():
+                col = col.lower()
+                if col not in row:
+                    return False
+                if row[col] != expected:
+                    return False
+            return True
+
+        return [row.copy() for row in table_data if matches(row)]
+
+    return cacher(key, run_select)
 
 def update(metadata: dict, table_name: str, table_data: list,
            set_clause: dict, where_clause: dict = None) -> list[dict]:
@@ -369,16 +399,17 @@ def update(metadata: dict, table_name: str, table_data: list,
                     значениями.
 
     Вызывает:
-        ValueError: Если таблица с указанным именем не найдена в метаданных, в SET
-                    указана несуществующая колонка или значение не может быть
-                    приведено к типу, указанному в метаданных.
+        KeyError: Если таблица с указанным именем не найдена в метаданных или
+                  в SET указана несуществующая колонка.
+        ValueError: Если значение не может быть приведено к типу, указанному
+                    в метаданных.
 
     """
 
     table_name = table_name.lower()
     table = _get_table(metadata, table_name)
     if table is None:
-        raise ValueError(f'Таблица "{table_name}" не существует.')
+        raise KeyError(f'таблица "{table_name}" не существует.')
 
     columns = table.get("columns", [])
     columns_types = {col["name"]: col["type"] for col in table["columns"]}
@@ -387,7 +418,7 @@ def update(metadata: dict, table_name: str, table_data: list,
     # Проверяем, что все колонки из SET существуют в схеме
     for col in set_clause.keys():
         if col.lower() not in allowed_columns:
-            raise ValueError(f'Колонка "{col}" не существует в таблице "{table_name}".')
+            raise KeyError(f'колонка "{col}" не существует в таблице "{table_name}".')
 
     def matches(row :dict) -> bool:
         if where_clause is None:
@@ -415,6 +446,7 @@ def update(metadata: dict, table_name: str, table_data: list,
 
     return new_table
 
+@decorators.confirm_action('удаление записей')
 def delete(table_data :list, where_clause :dict = None) -> list:
     """
     Удаляет строки, совпадающие с where_clause.
@@ -436,6 +468,9 @@ def delete(table_data :list, where_clause :dict = None) -> list:
 
     filtered = [row.copy() for row in table_data if not matches(row)]
 
+    # очищаем кэш, что бы select заново считывал таблицу
+    clear_cache()
+
     return filtered
 
 def table_info(metadata: dict, table_name: str) -> dict:
@@ -444,12 +479,11 @@ def table_info(metadata: dict, table_name: str) -> dict:
     """
 
     table_name = table_name.lower()
-    tables = metadata.get('tables', [])
-    for t in tables:
-        t_name = t.get('name', '')
-        if t_name == table_name:
-            return {
-                'name': t_name,
-                'columns': t.get('columns', [])
-            }
-    return None
+    table = _get_table(metadata,table_name)
+    if table:
+        return {
+            'name': table.get('name', ''),
+            'columns': table.get('columns', [])
+        }
+    else:
+        return None
