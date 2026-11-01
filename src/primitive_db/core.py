@@ -223,6 +223,7 @@ def list_tables(metadata :dict) -> list:
     tables = metadata.get('tables', [])
     return [table.get('name','') for table in tables]
 
+@decorators.log_time
 def insert(metadata :dict, table_name :str,
            table_data :list[dict], values :list) -> tuple[list[dict], int]:
     """
@@ -307,6 +308,7 @@ def insert(metadata :dict, table_name :str,
 
     return new_table, next_id
 
+@decorators.log_time
 def select(metadata :dict, table_name :str,
            table_data: list[dict], where_clause: dict = None) -> list[dict]:
     """

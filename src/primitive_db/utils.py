@@ -152,3 +152,20 @@ def load_table_data(table_name :str) -> list:
         raise RuntimeError(
             f'ошибка чтения файла данных. {e}',
         )
+
+def remove_data_file(table_name: str) -> None:
+    """Удаляет JSON-файл"""
+
+    try:
+        filepath = os.path.join(constants.DB_DATA_PATH, f'{table_name.lower()}.json')
+        os.remove(filepath)
+    except PermissionError:
+        raise RuntimeError(
+            'нет прав на удаление файла данных. '
+            'Изменения не сохранились'
+        )
+    except OSError as e:
+        raise RuntimeError(
+            f'ошибка при удвлении файла данных. {e}',
+        )
+      
