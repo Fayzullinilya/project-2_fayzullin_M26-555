@@ -210,6 +210,7 @@ def drop_table(metadata :dict, table_name :str) -> dict:
     for i, table in enumerate(tables):
         if table.get('name', '') == table_name:
             del tables[i]
+            clear_cache()
             return metadata
 
     raise KeyError(f'таблица "{table_name}" не найдена.')
@@ -443,6 +444,9 @@ def update(metadata: dict, table_name: str, table_data: list,
             expected_type = columns_types[col_name]
             value = _validate_value(raw_value, col_name, expected_type)
             row[col_name] = value
+
+    # очищаем кэш, что бы select заново считывал таблицу
+    clear_cache()
 
     return new_table
 
