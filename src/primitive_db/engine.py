@@ -81,6 +81,7 @@ def handle_drop(db_meta :dict, args :list[str]) -> dict:
     db_meta_new = core.drop_table(db_meta, table_name)
     if db_meta_new:
         utils.save_metadata(constants.DB_META_JSON, db_meta_new)
+        utils.remove_data_file(table_name)
         print(f'Таблица "{table_name}" успешно удалена.')
     
     return db_meta_new
